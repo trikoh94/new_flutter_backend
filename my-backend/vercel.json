@@ -8,15 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "index.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "index.js"
     }
-  ],
-  "env": {
-    "HUGGINGFACE_API_KEY": "hf_xxx"
-  }
+  ]
 } 
