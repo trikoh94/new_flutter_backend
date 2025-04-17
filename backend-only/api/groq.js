@@ -23,9 +23,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Get the specific endpoint from the URL
-  const path = req.url || '';
-  const endpoint = path.split('/').pop() || '';
+  // Get the endpoint from the URL
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const endpoint = url.pathname.split('/').pop();
 
   try {
     switch (endpoint) {
@@ -37,7 +37,14 @@ export default async function handler(req, res) {
 
       case 'generate-idea':
         if (req.method === 'POST') {
-          const { category, keywords } = req.body;
+          let body;
+          try {
+            body = JSON.parse(req.body);
+          } catch (e) {
+            return res.status(400).json({ error: 'Invalid JSON in request body' });
+          }
+
+          const { category, keywords } = body;
           if (!category || !keywords) {
             return res.status(400).json({ error: 'Category and keywords are required' });
           }
@@ -68,7 +75,14 @@ export default async function handler(req, res) {
 
       case 'analyze-ideas':
         if (req.method === 'POST') {
-          const { ideas } = req.body;
+          let body;
+          try {
+            body = JSON.parse(req.body);
+          } catch (e) {
+            return res.status(400).json({ error: 'Invalid JSON in request body' });
+          }
+
+          const { ideas } = body;
           if (!ideas || !Array.isArray(ideas) || ideas.length === 0) {
             return res.status(400).json({ error: 'Ideas array is required and must not be empty' });
           }
@@ -100,12 +114,15 @@ export default async function handler(req, res) {
         break;
 
       default:
-        return res.status(404).json({ error: 'Endpoint not found', path, endpoint });
+        return res.status(404).json({ error: 'Endpoint not found', path: url.pathname, endpoint });
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed', method: req.method, endpoint });
   } catch (error) {
     console.error('Error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 } 
