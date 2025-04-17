@@ -1,6 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/ai_config.dart';
 import '../models/idea.dart';
 
 class AIService {
@@ -8,14 +8,8 @@ class AIService {
   factory AIService() => _instance;
   AIService._internal();
 
-  final String _baseUrl = 'https://new-backend-lac.vercel.app/api';
-  final Map<String, String> _headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
   Future<T> _retryRequest<T>(Future<T> Function() request) async {
-    int maxAttempts = 3;
+    int maxAttempts = AIConfig.maxRetries;
     int attempt = 0;
     Duration delay = const Duration(seconds: 2);
 
@@ -37,15 +31,24 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/generate-idea'),
-          headers: _headers,
-          body: jsonEncode({'prompt': prompt}),
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
+          body: jsonEncode({
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are a helpful AI assistant that generates innovative business ideas. Please provide ideas in a clear, numbered list format.'
+              },
+              {'role': 'user', 'content': prompt}
+            ]
+          }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data['response'] != null || data['generated_text'] != null) {
-            final text = data['response'] ?? data['generated_text'];
+          if (data['response'] != null) {
+            final text = data['response'];
             return text
                 .split('\n')
                 .where((line) => line.trim().isNotEmpty)
@@ -53,10 +56,6 @@ class AIService {
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception('Failed to generate ideas: ${response.statusCode}');
         }
@@ -70,29 +69,31 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/analyze-ideas'),
-          headers: _headers,
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'ideas': [
+            'messages': [
               {
-                'title': idea.title,
-                'description': idea.description,
+                'role': 'system',
+                'content':
+                    'You are a business analyst AI that provides detailed portfolio insights. Please analyze the following business idea and provide a comprehensive analysis including market potential, risks, and opportunities.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please analyze this business idea:\nTitle: ${idea.title}\nDescription: ${idea.description}'
               }
-            ],
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['analysis'] != null) {
-            return data[0]['analysis'];
+          if (data['response'] != null) {
+            return data['response'];
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception(
               'Failed to get portfolio insights: ${response.statusCode}');
@@ -107,27 +108,31 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/implementation-plan'),
-          headers: _headers,
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'idea': {
-              'title': idea.title,
-              'description': idea.description,
-            },
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are a project planning AI that provides detailed implementation steps. Please break down the implementation into clear, actionable steps.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please provide implementation steps for:\nTitle: ${idea.title}\nDescription: ${idea.description}'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['steps'] != null) {
-            return data[0]['steps'];
+          if (data['response'] != null) {
+            return data['response'];
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception(
               'Failed to get implementation steps: ${response.statusCode}');
@@ -142,22 +147,30 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/categorize-idea'),
-          headers: _headers,
-          body: jsonEncode({'idea': idea}),
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
+          body: jsonEncode({
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are a business categorization AI. Please categorize the given business idea into the most appropriate category and provide a brief explanation.'
+              },
+              {
+                'role': 'user',
+                'content': 'Please categorize this business idea: $idea'
+              }
+            ]
+          }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['category'] != null) {
-            return data[0]['category'];
+          if (data['response'] != null) {
+            return data['response'];
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception('Failed to categorize idea: ${response.statusCode}');
         }
@@ -171,25 +184,31 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/check-similarity'),
-          headers: _headers,
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'text1': text1,
-            'text2': text2,
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that analyzes the similarity between business ideas. Please provide a detailed comparison and similarity analysis.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please analyze the similarity between these two ideas:\n1. $text1\n2. $text2'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['similarity_analysis'] != null) {
-            return data[0]['similarity_analysis'];
+          if (data['response'] != null) {
+            return data['response'];
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception('Failed to check similarity: ${response.statusCode}');
         }
@@ -199,57 +218,35 @@ class AIService {
     });
   }
 
-  Future<String> analyzeIdeas(List<Map<String, dynamic>> ideas) async {
-    return _retryRequest(() async {
-      try {
-        final response = await http.post(
-          Uri.parse('$_baseUrl/analyze-ideas'),
-          headers: _headers,
-          body: jsonEncode({'ideas': ideas}),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data[0]['analysis'] != null) {
-            return data[0]['analysis'];
-          } else {
-            throw Exception('Invalid response format');
-          }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
-        } else {
-          throw Exception('Failed to analyze ideas: ${response.statusCode}');
-        }
-      } catch (e) {
-        throw Exception('Error analyzing ideas: $e');
-      }
-    });
-  }
-
   Future<String> analyzeMindMap(List<String> ideas) async {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/analyze-ideas'),
-          headers: _headers,
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'ideas': ideas.map((idea) => {'text': idea}).toList(),
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that analyzes mind maps and provides insights about the relationships between ideas. Please analyze the following ideas and identify patterns, connections, and potential synergies.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please analyze these connected ideas:\n${ideas.map((idea) => "- $idea").join("\n")}'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['analysis'] != null) {
-            return data[0]['analysis'];
+          if (data['response'] != null) {
+            return data['response'];
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception('Failed to analyze mind map: ${response.statusCode}');
         }
@@ -263,17 +260,24 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/generate-idea'),
-          headers: _headers,
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'prompt': 'Generate 3 related ideas for: $idea',
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that generates related business ideas. Please provide 3 innovative and related ideas in a clear, numbered list format.'
+              },
+              {'role': 'user', 'content': 'Generate 3 related ideas for: $idea'}
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data['response'] != null || data['generated_text'] != null) {
-            final text = data['response'] ?? data['generated_text'];
+          if (data['response'] != null) {
+            final text = data['response'];
             return text
                 .split('\n')
                 .where((line) => line.trim().isNotEmpty)
@@ -281,10 +285,6 @@ class AIService {
           } else {
             throw Exception('Invalid response format');
           }
-        } else if (response.statusCode == 429) {
-          throw Exception('Rate limit exceeded. Please try again later.');
-        } else if (response.statusCode >= 500) {
-          throw Exception('Server error. Please try again later.');
         } else {
           throw Exception('Failed to get suggestions: ${response.statusCode}');
         }
@@ -294,23 +294,69 @@ class AIService {
     });
   }
 
-  Future<List<String>> suggestConnections(String idea) async {
+  Future<String> analyzeIdeas(List<Map<String, dynamic>> ideas) async {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/analyze-ideas'),
-          headers: {'Content-Type': 'application/json'},
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'ideas': [
-              {'text': idea},
-            ],
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that analyzes multiple business ideas and provides comprehensive insights. Please analyze the ideas and identify patterns, strengths, and potential improvements.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please analyze these business ideas:\n${ideas.map((idea) => "- ${idea['title']}: ${idea['description']}").join("\n")}'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['analysis'] != null) {
-            final text = data[0]['analysis'];
+          if (data['response'] != null) {
+            return data['response'];
+          } else {
+            throw Exception('Invalid response format');
+          }
+        } else {
+          throw Exception('Failed to analyze ideas: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Error analyzing ideas: $e');
+      }
+    });
+  }
+
+  Future<List<String>> suggestConnections(String idea) async {
+    return _retryRequest(() async {
+      try {
+        final response = await http.post(
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
+          body: jsonEncode({
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that suggests potential connections and relationships between business ideas. Please provide insights in a clear, numbered list format.'
+              },
+              {
+                'role': 'user',
+                'content': 'Suggest potential connections for this idea: $idea'
+              }
+            ]
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['response'] != null) {
+            final text = data['response'];
             return text.split('\n').where((line) => line.isNotEmpty).toList();
           } else {
             throw Exception('Invalid response format');
@@ -330,18 +376,29 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/summarize-idea'),
-          headers: {'Content-Type': 'application/json'},
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'idea': {'title': title, 'description': description}
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that provides concise summaries of business ideas. Please provide a clear and structured summary.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please summarize this idea:\nTitle: $title\nDescription: $description'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['summary'] != null) {
+          if (data['response'] != null) {
             return [
-              {'summary': data[0]['summary']}
+              {'summary': data['response']}
             ];
           } else {
             throw Exception('Invalid response format');
@@ -360,18 +417,29 @@ class AIService {
     return _retryRequest(() async {
       try {
         final response = await http.post(
-          Uri.parse('$_baseUrl/feedback-idea'),
-          headers: {'Content-Type': 'application/json'},
+          Uri.parse(AIConfig.chatEndpoint),
+          headers: AIConfig.headers,
           body: jsonEncode({
-            'idea': {'title': title, 'description': description}
+            'messages': [
+              {
+                'role': 'system',
+                'content':
+                    'You are an AI that provides constructive feedback on business ideas. Please provide detailed feedback including strengths, weaknesses, and suggestions for improvement.'
+              },
+              {
+                'role': 'user',
+                'content':
+                    'Please provide feedback on this idea:\nTitle: $title\nDescription: $description'
+              }
+            ]
           }),
         );
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data[0]['feedback'] != null) {
+          if (data['response'] != null) {
             return [
-              {'feedback': data[0]['feedback']}
+              {'feedback': data['response']}
             ];
           } else {
             throw Exception('Invalid response format');

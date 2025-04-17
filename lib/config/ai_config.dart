@@ -3,8 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AIConfig {
   // API endpoints
   static const String baseUrl =
-      'https://new-backend-trikoh94s-projects.vercel.app';
-  static const String chatEndpoint = '$baseUrl/api/generate-idea';
+      'https://ai-sdk-starter-groq-tau-five.vercel.app';
+  static const String chatEndpoint = '$baseUrl/api/chat';
 
   // API Key from environment variables - not needed for backend API
   static String get apiKey => '';
