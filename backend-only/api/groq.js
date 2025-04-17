@@ -24,7 +24,8 @@ export default async function handler(req, res) {
   }
 
   // Get the specific endpoint from the URL
-  const endpoint = req.url.split('/').pop();
+  const path = req.url || '';
+  const endpoint = path.split('/').pop() || '';
 
   try {
     switch (endpoint) {
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
         break;
 
       default:
-        return res.status(404).json({ error: 'Endpoint not found' });
+        return res.status(404).json({ error: 'Endpoint not found', path, endpoint });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
