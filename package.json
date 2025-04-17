@@ -1,13 +1,18 @@
 {
-  "name": "ideation-hub-backend",
-  "version": "1.0.0",
-  "description": "Backend for Ideation Hub application",
+  "name": "ai-sdk-starter-groq",
+  "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "dotenv": "^16.0.3",
-    "groq-sdk": "^0.3.0"
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "engines": {
-    "node": ">=14.0.0"
+  "dependencies": {
+    "@vercel/ai": "^1.0.0",
+    "ai": "^2.2.35",
+    "groq-sdk": "^0.3.0",
+    "next": "14.1.0",
+    "react": "^18",
+    "react-dom": "^18"
   }
 }
