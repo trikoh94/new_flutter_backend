@@ -3,6 +3,8 @@
     { "src": "api/groq.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "api/groq.js" }
+    { "src": "/api/test", "dest": "api/groq.js" },
+    { "src": "/api/generate-idea", "dest": "api/groq.js" },
+    { "src": "/api/analyze-ideas", "dest": "api/groq.js" }
   ]
 } 
