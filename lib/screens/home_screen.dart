@@ -348,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildIdeasTab() {
     return Column(
-      children: [
+          children: [
         const QuickActionsBar(),
         Expanded(
           child: _ideas.isEmpty && !_isLoadingMore

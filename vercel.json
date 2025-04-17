@@ -2,21 +2,20 @@
   "version": 2,
   "builds": [
     {
-      "src": "new_backend/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60
-      }
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "new_backend/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "new_backend/index.js"
+      "src": "/api/groq/(.*)",
+      "dest": "/api/groq.js",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
     }
   ]
 } 

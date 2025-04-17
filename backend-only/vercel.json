@@ -1,0 +1,8 @@
+{
+  "builds": [
+    { "src": "api/groq.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "api/groq.js" }
+  ]
+} 
