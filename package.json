@@ -8,11 +8,19 @@
     "start": "next start"
   },
   "dependencies": {
-    "@vercel/ai": "^1.0.0",
-    "ai": "^2.2.35",
-    "groq-sdk": "^0.3.0",
-    "next": "14.1.0",
-    "react": "^18",
-    "react-dom": "^18"
-  }
+    "next": "^14.2.28"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "description": "A new Flutter project.",
+  "main": "test-api.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
