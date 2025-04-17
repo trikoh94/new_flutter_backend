@@ -15,34 +15,42 @@ class Idea {
   final String description;
 
   @HiveField(3)
-  final DateTime createdAt;
+  final String? projectId;
 
   @HiveField(4)
-  final List<String> connectedIdeas;
-
-  @HiveField(5)
   final double x; // 마인드맵에서의 x 좌표
 
-  @HiveField(6)
+  @HiveField(5)
   final double y; // 마인드맵에서의 y 좌표
 
+  @HiveField(6)
+  final List<String> connectedIdeas;
+
   @HiveField(7)
-  final bool isShared;
+  final DateTime createdAt;
 
   @HiveField(8)
-  final DateTime? sharedAt;
+  final DateTime updatedAt;
 
   @HiveField(9)
+  final bool isShared;
+
+  @HiveField(10)
+  final DateTime? sharedAt;
+
+  @HiveField(11)
   final bool isAIGenerated;
 
   Idea({
     required this.id,
     required this.title,
     required this.description,
-    required this.createdAt,
-    required this.connectedIdeas,
+    this.projectId,
     required this.x,
     required this.y,
+    required this.connectedIdeas,
+    required this.createdAt,
+    required this.updatedAt,
     this.isShared = false,
     this.sharedAt,
     this.isAIGenerated = false,
@@ -56,17 +64,19 @@ class Idea {
       id: const Uuid().v4(),
       title: title,
       description: description,
-      createdAt: DateTime.now(),
-      connectedIdeas: [],
+      projectId: null,
       x: 0,
       y: 0,
-      isAIGenerated: false,
+      connectedIdeas: [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 
   Idea copyWith({
     String? title,
     String? description,
+    String? projectId,
     List<String>? connectedIdeas,
     double? x,
     double? y,
@@ -78,10 +88,12 @@ class Idea {
       id: id,
       title: title ?? this.title,
       description: description ?? this.description,
-      createdAt: createdAt,
-      connectedIdeas: connectedIdeas ?? this.connectedIdeas,
+      projectId: projectId ?? this.projectId,
       x: x ?? this.x,
       y: y ?? this.y,
+      connectedIdeas: connectedIdeas ?? this.connectedIdeas,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
       isShared: isShared ?? this.isShared,
       sharedAt: sharedAt ?? this.sharedAt,
       isAIGenerated: isAIGenerated ?? this.isAIGenerated,
@@ -93,10 +105,12 @@ class Idea {
       'id': id,
       'title': title,
       'description': description,
-      'createdAt': createdAt.toIso8601String(),
-      'connectedIdeas': connectedIdeas,
+      'projectId': projectId,
       'x': x,
       'y': y,
+      'connectedIdeas': connectedIdeas,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
       'isShared': isShared,
       'sharedAt': sharedAt?.toIso8601String(),
       'isAIGenerated': isAIGenerated,
@@ -105,16 +119,19 @@ class Idea {
 
   factory Idea.fromMap(Map<String, dynamic> map) {
     return Idea(
-      id: map['id'],
-      title: map['title'],
-      description: map['description'],
-      createdAt: DateTime.parse(map['createdAt']),
-      connectedIdeas: List<String>.from(map['connectedIdeas']),
-      x: map['x'] ?? 0,
-      y: map['y'] ?? 0,
+      id: map['id'] as String,
+      title: map['title'] as String,
+      description: map['description'] as String,
+      projectId: map['projectId'] as String?,
+      x: (map['x'] as num).toDouble(),
+      y: (map['y'] as num).toDouble(),
+      connectedIdeas: List<String>.from(map['connectedIdeas'] ?? []),
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: DateTime.parse(map['updatedAt'] as String),
       isShared: map['isShared'] ?? false,
-      sharedAt:
-          map['sharedAt'] != null ? DateTime.parse(map['sharedAt']) : null,
+      sharedAt: map['sharedAt'] != null
+          ? DateTime.parse(map['sharedAt'] as String)
+          : null,
       isAIGenerated: map['isAIGenerated'] ?? false,
     );
   }

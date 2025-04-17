@@ -60,7 +60,7 @@ class _MindMapScreenState extends State<MindMapScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Connected Ideas',
+                '연결된 아이디어',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -77,7 +77,7 @@ class _MindMapScreenState extends State<MindMapScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Text('No connected ideas.');
+                    return const Text('연결된 아이디어가 없습니다.');
                   }
                   return Container(
                     height: 200,
@@ -110,13 +110,13 @@ class _MindMapScreenState extends State<MindMapScreen> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
+                    child: const Text('닫기'),
                   ),
                   TextButton(
                     onPressed: () {
-                      // TODO: Implement idea modification functionality
+                      // TODO: 아이디어 수정 기능 구현
                     },
-                    child: const Text('Modify'),
+                    child: const Text('수정'),
                   ),
                 ],
               ),
@@ -170,7 +170,7 @@ class _MindMapScreenState extends State<MindMapScreen> {
             y: screenSize.height / 2,
           );
           try {
-            await _firebaseService.createIdea(widget.projectId, idea);
+            await _firebaseService.createIdea(idea, widget.projectId);
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

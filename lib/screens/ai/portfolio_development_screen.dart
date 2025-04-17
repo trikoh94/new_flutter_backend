@@ -85,7 +85,7 @@ class _PortfolioDevelopmentScreenState extends State<PortfolioDevelopmentScreen>
     try {
       final ideas = await _aiService.generateIdeas(_ideaController.text);
       setState(() {
-        _summaryResult = ideas;
+        _summaryResult = ideas.join('\n');
       });
     } catch (e) {
       setState(() {
@@ -194,11 +194,11 @@ class _PortfolioDevelopmentScreenState extends State<PortfolioDevelopmentScreen>
     }
   }
 
-  Future<void> _showEditDialog(Idea idea) async {
+  void _showEditDialog(Idea idea) {
     final titleController = TextEditingController(text: idea.title);
     final descriptionController = TextEditingController(text: idea.description);
 
-    final result = await showDialog<Map<String, String>>(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Idea'),
@@ -207,11 +207,18 @@ class _PortfolioDevelopmentScreenState extends State<PortfolioDevelopmentScreen>
           children: [
             TextField(
               controller: titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'),
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
               maxLines: 3,
             ),
           ],
@@ -222,32 +229,44 @@ class _PortfolioDevelopmentScreenState extends State<PortfolioDevelopmentScreen>
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, {
-              'title': titleController.text,
-              'description': descriptionController.text,
-            }),
+            onPressed: () async {
+              final updatedIdea = Idea(
+                id: idea.id,
+                title: titleController.text,
+                description: descriptionController.text,
+                projectId: idea.projectId,
+                x: idea.x,
+                y: idea.y,
+                connectedIdeas: idea.connectedIdeas,
+                createdAt: idea.createdAt,
+                updatedAt: DateTime.now(),
+                isShared: idea.isShared,
+                sharedAt: idea.sharedAt,
+                isAIGenerated: idea.isAIGenerated,
+              );
+
+              try {
+                await _firebaseService.updateIdea(
+                    updatedIdea, widget.projectId);
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Idea updated successfully')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating idea: $e')),
+                  );
+                }
+              }
+            },
             child: const Text('Save'),
           ),
         ],
       ),
     );
-
-    if (result != null) {
-      final updatedIdea = Idea(
-        id: idea.id,
-        title: result['title']!,
-        description: result['description']!,
-        createdAt: idea.createdAt,
-        connectedIdeas: idea.connectedIdeas,
-        x: idea.x,
-        y: idea.y,
-        isShared: idea.isShared,
-      );
-      await _firebaseService.updateIdea(widget.projectId, updatedIdea);
-      setState(() {
-        _errorMessage = null;
-      });
-    }
   }
 
   @override

@@ -1,21 +1,40 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/idea.dart';
 import '../models/category.dart';
+import '../models/project_model.dart';
 
 class LocalStorage {
+  static final LocalStorage _instance = LocalStorage._internal();
+  factory LocalStorage() => _instance;
+  LocalStorage._internal();
+
   static const String _ideasBox = 'ideas';
+  static const String _projectsBox = 'projects';
   static const String _categoriesBox = 'categories';
   static const String _syncStatusBox = 'sync_status';
 
-  static Future<void> init() async {
-    await Hive.initFlutter();
+  Future<void> init() async {
+    if (kIsWeb) {
+      Hive.init('mindmap_db');
+    } else {
+      await Hive.initFlutter();
+    }
 
     // Register adapters
-    Hive.registerAdapter(IdeaAdapter());
-    Hive.registerAdapter(CategoryAdapter());
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(IdeaAdapter());
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(ProjectModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(CategoryAdapter());
+    }
 
     // Open boxes
     await Hive.openBox<Idea>(_ideasBox);
+    await Hive.openBox<ProjectModel>(_projectsBox);
     await Hive.openBox<Category>(_categoriesBox);
     await Hive.openBox<Map>(_syncStatusBox);
   }
@@ -34,6 +53,23 @@ class LocalStorage {
 
   static Future<Idea?> getIdea(String id) async {
     final box = await Hive.openBox<Idea>(_ideasBox);
+    return box.get(id);
+  }
+
+  // Projects
+  static Future<void> saveProject(ProjectModel project) async {
+    final box = await Hive.openBox<ProjectModel>(_projectsBox);
+    await box.put(project.id, project);
+    _updateSyncStatus('project_${project.id}', false);
+  }
+
+  static Future<List<ProjectModel>> getProjects() async {
+    final box = await Hive.openBox<ProjectModel>(_projectsBox);
+    return box.values.toList();
+  }
+
+  static Future<ProjectModel?> getProject(String id) async {
+    final box = await Hive.openBox<ProjectModel>(_projectsBox);
     return box.get(id);
   }
 
@@ -57,14 +93,15 @@ class LocalStorage {
   // Sync Status
   static Future<void> _updateSyncStatus(String key, bool isSynced) async {
     final box = await Hive.openBox<Map>(_syncStatusBox);
-    await box.put(key, {'isSynced': isSynced, 'lastUpdated': DateTime.now()});
+    await box.put(
+        key, {'key': key, 'isSynced': isSynced, 'lastUpdated': DateTime.now()});
   }
 
-  static Future<List> getUnsyncedItems() async {
+  static Future<List<String>> getUnsyncedItems() async {
     final box = await Hive.openBox<Map>(_syncStatusBox);
     return box.values
         .where((status) => !status['isSynced'])
-        .map((status) => status['key'])
+        .map((status) => status['key'] as String)
         .toList();
   }
 
@@ -75,10 +112,12 @@ class LocalStorage {
   // Clear local data
   static Future<void> clearAll() async {
     final ideasBox = await Hive.openBox<Idea>(_ideasBox);
+    final projectsBox = await Hive.openBox<ProjectModel>(_projectsBox);
     final categoriesBox = await Hive.openBox<Category>(_categoriesBox);
     final syncStatusBox = await Hive.openBox<Map>(_syncStatusBox);
 
     await ideasBox.clear();
+    await projectsBox.clear();
     await categoriesBox.clear();
     await syncStatusBox.clear();
   }

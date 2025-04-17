@@ -1,18 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import 'package:hive/hive.dart';
 
+part 'project_model.g.dart';
+
+@HiveType(typeId: 1)
 class ProjectModel {
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   final String title;
+
+  @HiveField(2)
   final String description;
+
+  @HiveField(3)
   final String status;
+
+  @HiveField(4)
   final List<String> technologies;
-  final String githubUrl;
-  final String demoUrl;
+
+  @HiveField(5)
+  final String? githubUrl;
+
+  @HiveField(6)
+  final String? demoUrl;
+
+  @HiveField(7)
   final List<String> images;
+
+  @HiveField(8)
   final DateTime startDate;
+
+  @HiveField(9)
   final DateTime createdAt;
+
+  @HiveField(10)
   final DateTime updatedAt;
+
+  @HiveField(11)
+  final String userId;
 
   ProjectModel({
     required this.id,
@@ -20,12 +48,13 @@ class ProjectModel {
     required this.description,
     required this.status,
     required this.technologies,
-    required this.githubUrl,
-    required this.demoUrl,
+    this.githubUrl,
+    this.demoUrl,
     required this.images,
     required this.startDate,
     required this.createdAt,
     required this.updatedAt,
+    required this.userId,
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -35,12 +64,13 @@ class ProjectModel {
       description: json['description'] as String,
       status: json['status'] as String,
       technologies: List<String>.from(json['technologies'] as List),
-      githubUrl: json['githubUrl'] as String,
-      demoUrl: json['demoUrl'] as String,
+      githubUrl: json['githubUrl'] as String?,
+      demoUrl: json['demoUrl'] as String?,
       images: List<String>.from(json['images'] as List),
       startDate: _parseDateTime(json['startDate']),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
+      userId: json['userId'] as String,
     );
   }
 
@@ -68,24 +98,13 @@ class ProjectModel {
       'startDate': startDate.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'userId': userId,
     };
   }
 
   factory ProjectModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return ProjectModel(
-      id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      status: data['status'] ?? 'planning',
-      technologies: List<String>.from(data['technologies'] ?? []),
-      githubUrl: data['githubUrl'] ?? '',
-      demoUrl: data['demoUrl'] ?? '',
-      images: List<String>.from(data['images'] ?? []),
-      startDate: _parseDateTime(data['startDate']),
-      createdAt: _parseDateTime(data['createdAt']),
-      updatedAt: _parseDateTime(data['updatedAt']),
-    );
+    final data = doc.data() as Map<String, dynamic>;
+    return ProjectModel.fromMap(data, doc.id);
   }
 
   Map<String, dynamic> toFirestore() {
@@ -100,23 +119,8 @@ class ProjectModel {
       'startDate': Timestamp.fromDate(startDate),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'userId': userId,
     };
-  }
-
-  factory ProjectModel.fromMap(Map<String, dynamic> data) {
-    return ProjectModel(
-      id: data['id'] as String,
-      title: data['title'] ?? data['name'] ?? '',
-      description: data['description'] ?? '',
-      status: data['status'] ?? 'active',
-      technologies: List<String>.from(data['technologies'] ?? []),
-      githubUrl: data['githubUrl'] ?? '',
-      demoUrl: data['demoUrl'] ?? '',
-      images: List<String>.from(data['images'] ?? []),
-      startDate: _parseDateTime(data['startDate']),
-      createdAt: _parseDateTime(data['createdAt']),
-      updatedAt: _parseDateTime(data['updatedAt']),
-    );
   }
 
   Map<String, dynamic> toMap() {
@@ -132,7 +136,25 @@ class ProjectModel {
       'startDate': Timestamp.fromDate(startDate),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'userId': userId,
     };
+  }
+
+  factory ProjectModel.fromMap(Map<String, dynamic> map, String documentId) {
+    return ProjectModel(
+      id: documentId,
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      status: map['status'] ?? 'In Progress',
+      technologies: List<String>.from(map['technologies'] ?? []),
+      githubUrl: map['githubUrl'],
+      demoUrl: map['demoUrl'],
+      images: List<String>.from(map['images'] ?? []),
+      startDate: _parseDateTime(map['startDate']),
+      createdAt: _parseDateTime(map['createdAt']),
+      updatedAt: _parseDateTime(map['updatedAt']),
+      userId: map['userId'] ?? '',
+    );
   }
 
   factory ProjectModel.create({
@@ -146,12 +168,13 @@ class ProjectModel {
       description: description,
       status: 'active',
       technologies: [],
-      githubUrl: '',
-      demoUrl: '',
+      githubUrl: null,
+      demoUrl: null,
       images: [],
       startDate: now,
       createdAt: now,
       updatedAt: now,
+      userId: '',
     );
   }
 
@@ -167,6 +190,7 @@ class ProjectModel {
     DateTime? startDate,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? userId,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -180,6 +204,7 @@ class ProjectModel {
       startDate: startDate ?? this.startDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      userId: userId ?? this.userId,
     );
   }
 }

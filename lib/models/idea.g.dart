@@ -20,20 +20,22 @@ class IdeaAdapter extends TypeAdapter<Idea> {
       id: fields[0] as String,
       title: fields[1] as String,
       description: fields[2] as String,
-      createdAt: fields[3] as DateTime,
-      connectedIdeas: (fields[4] as List).cast<String>(),
-      x: fields[5] as double,
-      y: fields[6] as double,
-      isShared: fields[7] as bool,
-      sharedAt: fields[8] as DateTime?,
-      isAIGenerated: fields[9] as bool,
+      projectId: fields[3] as String?,
+      x: fields[4] as double,
+      y: fields[5] as double,
+      connectedIdeas: (fields[6] as List).cast<String>(),
+      createdAt: fields[7] as DateTime,
+      updatedAt: fields[8] as DateTime,
+      isShared: fields[9] as bool,
+      sharedAt: fields[10] as DateTime?,
+      isAIGenerated: fields[11] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Idea obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,18 +43,22 @@ class IdeaAdapter extends TypeAdapter<Idea> {
       ..writeByte(2)
       ..write(obj.description)
       ..writeByte(3)
-      ..write(obj.createdAt)
+      ..write(obj.projectId)
       ..writeByte(4)
-      ..write(obj.connectedIdeas)
-      ..writeByte(5)
       ..write(obj.x)
-      ..writeByte(6)
+      ..writeByte(5)
       ..write(obj.y)
+      ..writeByte(6)
+      ..write(obj.connectedIdeas)
       ..writeByte(7)
-      ..write(obj.isShared)
+      ..write(obj.createdAt)
       ..writeByte(8)
-      ..write(obj.sharedAt)
+      ..write(obj.updatedAt)
       ..writeByte(9)
+      ..write(obj.isShared)
+      ..writeByte(10)
+      ..write(obj.sharedAt)
+      ..writeByte(11)
       ..write(obj.isAIGenerated);
   }
 

@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:uuid/uuid.dart';
-import '../models/category.dart';
-import '../models/project_model.dart';
-import '../models/idea.dart';
 import '../services/firebase_service.dart';
-import 'mind_map_screen.dart';
-import 'quick_idea_screen.dart';
-import 'ai/portfolio_development_screen.dart';
-import 'community_screen.dart';
-import 'portfolio_screen.dart';
+import '../widgets/ideas/idea_card.dart';
+import '../widgets/ideas/quick_actions_bar.dart';
+import '../widgets/common/error_view.dart';
+import '../widgets/common/empty_state_view.dart';
+import '../screens/portfolio_screen.dart';
+import '../screens/community_screen.dart';
+import '../models/project_model.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,55 +21,257 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  String? _selectedProjectId;
-  bool _isCreatingProject = false;
   int _selectedIndex = 0;
+  static const int _ideasPerPage = 10;
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+  List<DocumentSnapshot> _ideas = [];
+  DocumentSnapshot? _lastDocument;
+  bool _hasMore = true;
+  final _projectTitleController = TextEditingController();
+  final _projectDescriptionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    _loadInitialIdeas();
+  }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
+    _scrollController.dispose();
+    _projectTitleController.dispose();
+    _projectDescriptionController.dispose();
     super.dispose();
   }
 
-  Future<void> _createProject() async {
-    if (_titleController.text.isEmpty) return;
-
+  Future<void> _loadInitialIdeas() async {
     try {
-      final project = ProjectModel(
-        id: const Uuid().v4(),
-        title: _titleController.text,
-        description: _descriptionController.text,
-        status: 'active',
-        technologies: [],
-        githubUrl: '',
-        demoUrl: '',
-        images: [],
-        startDate: DateTime.now(),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await _firebaseService.createProject(project);
-      _titleController.clear();
-      _descriptionController.clear();
+      final snapshot = await _firebaseService.getPaginatedIdeas(_ideasPerPage);
+      if (!mounted) return;
+
       setState(() {
-        _isCreatingProject = false;
+        _ideas = snapshot?.docs ?? [];
+        _lastDocument = _ideas.isNotEmpty ? _ideas.last : null;
+        _hasMore = _ideas.length == _ideasPerPage;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create project: $e'),
-            action: SnackBarAction(
-              label: 'Try Again',
-              onPressed: _createProject,
-            ),
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load ideas: $e'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _loadInitialIdeas,
           ),
-        );
-      }
+        ),
+      );
     }
+  }
+
+  Future<void> _loadMoreIdeas() async {
+    if (!_hasMore || _isLoadingMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final snapshot = await _firebaseService.getPaginatedIdeas(
+        _ideasPerPage,
+        startAfter: _lastDocument,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _ideas.addAll(snapshot?.docs ?? []);
+        _lastDocument =
+            snapshot?.docs.isNotEmpty == true ? snapshot!.docs.last : null;
+        _hasMore = (snapshot?.docs.length ?? 0) == _ideasPerPage;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load more ideas: $e'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _loadMoreIdeas,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreIdeas();
+    }
+  }
+
+  Future<void> _showCreateProjectDialog() async {
+    context.push('/projects');
+  }
+
+  Future<void> _deleteIdea(String projectId, String ideaId, int index) async {
+    try {
+      await _firebaseService.deleteIdea(projectId, ideaId);
+      if (!mounted) return;
+
+      setState(() {
+        _ideas.removeAt(index);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Idea deleted')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete idea: $e'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _loadInitialIdeas(),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _exportIdeas(bool sharedOnly) async {
+    try {
+      final exportData =
+          await _firebaseService.exportIdeas(sharedOnly: sharedOnly);
+      final jsonString = json.encode(exportData);
+
+      // TODO: Implement platform-specific file saving
+      // For web, we can use the browser's download functionality
+      // For mobile, we can use the file system
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ideas exported successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export ideas: $e')),
+      );
+    }
+  }
+
+  void _showExportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Ideas'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Export All Ideas'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportIdeas(false);
+              },
+            ),
+            ListTile(
+              title: const Text('Export Shared Ideas Only'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportIdeas(true);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAssignProjectDialog(Map<String, dynamic> idea) {
+    if (idea == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Assign to Project'),
+        content: StreamBuilder<List<ProjectModel>>(
+          stream: _firebaseService.getProjects(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return ErrorView(
+                message: snapshot.error.toString(),
+                onRetry: () => setState(() {}),
+              );
+            }
+
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final projects = snapshot.data!;
+            if (projects.isEmpty) {
+              return const Center(
+                child: Text('No projects available. Create a project first.'),
+              );
+            }
+
+            return SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: projects.length,
+                itemBuilder: (context, index) {
+                  final project = projects[index];
+                  return ListTile(
+                    title: Text(project.title),
+                    onTap: () async {
+                      try {
+                        await _firebaseService.assignIdeaToProject(
+                          idea['id'],
+                          project.id,
+                          project.title,
+                        );
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        context.push('/mind-map/${project.id}');
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to assign idea: $e'),
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -100,9 +301,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          _buildProjectsTab(),
-          _buildPortfolioTab(),
-          _buildCommunityTab(),
+          _buildIdeasTab(),
+          const PortfolioScreen(),
+          const CommunityScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -117,352 +318,152 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.lightbulb_outline),
             selectedIcon: Icon(Icons.lightbulb),
             label: 'Ideas',
+            tooltip: 'View and manage your ideas',
           ),
           NavigationDestination(
             icon: Icon(Icons.work_outline),
             selectedIcon: Icon(Icons.work),
             label: 'Portfolio',
+            tooltip: 'View your portfolio',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
             selectedIcon: Icon(Icons.people),
             label: 'Community',
+            tooltip: 'Connect with the community',
           ),
         ],
       ),
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton.extended(
-              onPressed: () {
-                setState(() {
-                  _isCreatingProject = true;
-                });
-              },
+              onPressed: _showCreateProjectDialog,
               icon: const Icon(Icons.add),
-              label: const Text('New Idea'),
+              label: const Text('New Project'),
+              tooltip: 'Create a new project',
+              heroTag: 'newProject',
             )
           : null,
     );
   }
 
-  Widget _buildProjectsTab() {
-    return StreamBuilder<List<DocumentSnapshot>>(
-      stream: _firebaseService.getProjects(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 48,
-                  color: Colors.red,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Oops! Something went wrong',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {});
+  Widget _buildIdeasTab() {
+    return Column(
+      children: [
+        const QuickActionsBar(),
+        Expanded(
+          child: _ideas.isEmpty && !_isLoadingMore
+              ? const EmptyStateView(
+                  icon: Icons.lightbulb_outline,
+                  title: 'No Ideas Yet',
+                  message: 'Start by creating a new idea or project',
+                  actionLabel: 'Create New Idea',
+                  actionRoute: '/quick-idea',
+                )
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    _ideas.clear();
+                    _lastDocument = null;
+                    await _loadInitialIdeas();
                   },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (!snapshot.hasData) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _getGridCrossAxisCount(context),
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: 6,
-            itemBuilder: (context, index) {
-              return Card(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 100,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        }
-
-        final projects = snapshot.data!;
-        if (projects.isEmpty && !_isCreatingProject) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.lightbulb_outline,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Your Ideas Await',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Transform your thoughts into reality.\nStart your journey of innovation.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () => setState(() => _isCreatingProject = true),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Start Creating'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Stack(
-          children: [
-            GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _getGridCrossAxisCount(context),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: projects.length,
-              itemBuilder: (context, index) {
-                final doc = projects[index];
-                final data = doc.data() as Map<String, dynamic>;
-                final project = ProjectModel(
-                  id: doc.id,
-                  title: data['title'] ?? '',
-                  description: data['description'] ?? '',
-                  status: data['status'] ?? 'active',
-                  technologies: List<String>.from(data['technologies'] ?? []),
-                  githubUrl: data['githubUrl'] ?? '',
-                  demoUrl: data['demoUrl'] ?? '',
-                  images: List<String>.from(data['images'] ?? []),
-                  startDate: DateTime.parse(
-                      data['startDate'] ?? DateTime.now().toIso8601String()),
-                  createdAt: DateTime.parse(
-                      data['createdAt'] ?? DateTime.now().toIso8601String()),
-                  updatedAt: DateTime.parse(
-                      data['updatedAt'] ?? DateTime.now().toIso8601String()),
-                );
-                return _buildProjectCard(project);
-              },
-            ),
-            if (_isCreatingProject)
-              Container(
-                color: Colors.black54,
-                child: Center(
-                  child: Card(
-                    margin: const EdgeInsets.all(32),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Give Life to Your Idea',
-                            style: Theme.of(context).textTheme.titleLarge,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _ideas.length + (_isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _ideas.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(),
                           ),
-                          const SizedBox(height: 24),
-                          TextField(
-                            controller: _titleController,
-                            decoration: const InputDecoration(
-                              labelText: 'Idea Title',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.title),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _descriptionController,
-                            decoration: const InputDecoration(
-                              labelText: 'Idea Description',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.description),
-                            ),
-                            maxLines: 3,
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isCreatingProject = false;
-                                    _titleController.clear();
-                                    _descriptionController.clear();
-                                  });
-                                },
-                                child: const Text('Cancel'),
+                        );
+                      }
+
+                      final ideaData =
+                          _ideas[index].data() as Map<String, dynamic>;
+                      return Dismissible(
+                        key: Key(ideaData['id'] ?? ''),
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (direction) async {
+                          return await showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Idea'),
+                              content: const Text(
+                                'Are you sure you want to delete this idea?',
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: _createProject,
-                                icon: const Icon(Icons.add),
-                                label: const Text('Create'),
-                              ),
-                            ],
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        onDismissed: (direction) {
+                          _deleteIdea(
+                            ideaData['projectId'] ?? 'unassigned',
+                            ideaData['id'],
+                            index,
+                          );
+                        },
+                        child: IdeaCard(
+                          idea: _ideas[index],
+                          onEdit: () => context.push(
+                            '/edit-idea/${ideaData['projectId'] ?? 'unassigned'}/${ideaData['id']}',
                           ),
-                        ],
-                      ),
-                    ),
+                          onDelete: () => _deleteIdea(
+                            ideaData['projectId'] ?? 'unassigned',
+                            ideaData['id'],
+                            index,
+                          ),
+                          onAddToMindMap: () {
+                            if (ideaData['projectId'] != null) {
+                              context
+                                  .push('/mind-map/${ideaData['projectId']}');
+                            } else {
+                              _showAssignProjectDialog(ideaData);
+                            }
+                          },
+                          onShare: () async {
+                            try {
+                              if (ideaData['isShared'] ?? false) {
+                                await _firebaseService
+                                    .unshareIdea(ideaData['id']);
+                              } else {
+                                await _firebaseService
+                                    .shareIdea(ideaData['id']);
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'Failed to update sharing status: $e'),
+                                ),
+                              );
+                            }
+                          },
+                          onExport: _showExportDialog,
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  int _getGridCrossAxisCount(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    if (width < 600) {
-      return 1; // Mobile
-    } else if (width < 1200) {
-      return 2; // Tablet
-    } else {
-      return 3; // Desktop
-    }
-  }
-
-  Widget _buildPortfolioTab() {
-    return const PortfolioScreen();
-  }
-
-  Widget _buildCommunityTab() {
-    return CommunityScreen(projectId: _selectedProjectId ?? '');
-  }
-
-  Widget _buildProjectCard(ProjectModel project) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.all(8),
-      child: InkWell(
-        onTap: () => context.push('/mind-map/${project.id}'),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      project.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.auto_awesome),
-                    onPressed: () =>
-                        context.push('/ai/portfolio/${project.id}'),
-                    tooltip: 'Enhance with AI',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                project.description,
-                style: const TextStyle(color: Colors.grey),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Created ${_formatDate(project.createdAt)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                ],
-              ),
-            ],
-          ),
         ),
-      ),
+      ],
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'today';
-    } else if (difference.inDays == 1) {
-      return 'yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.month}/${date.day}/${date.year}';
-    }
   }
 }

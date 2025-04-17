@@ -14,7 +14,7 @@ const fetch = require("node-fetch");
 // HuggingFace API 설정
 const HF_CONFIG = {
   baseUrl: 'https://api-inference.huggingface.co/models',
-  model: 'mistralai/Mistral-7B-Instruct-v0.1',
+  model: 'stabilityai/stablelm-2-zephyr-1_6b',
   headers: {
     'Authorization': `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
     'Content-Type': 'application/json'
