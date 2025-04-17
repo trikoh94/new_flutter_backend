@@ -2,6 +2,8 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
     
+    console.log('Using model: llama2-70b-4096');
+    
     const response = await fetch('https://api.groq.com/v1/chat/completions', {
       method: 'POST',
       headers: {
