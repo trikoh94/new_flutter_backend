@@ -1,5 +1,0 @@
-python3.13
-python3.13-dev
-python3.13-venv
-libgl1-mesa-glx
-libglib2.0-0 
