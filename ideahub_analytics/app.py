@@ -668,7 +668,7 @@ def main():
         st.header('System Architecture')
         
         # Display architecture diagram
-        st.image('arch.png', caption='System Architecture Diagram', use_column_width=True)
+        st.image('assets/arch.png', caption='System Architecture Diagram', use_column_width=True)
         
         # Architecture Description
         st.subheader('Architecture Components')
