@@ -1,0 +1,8 @@
+streamlit
+plotly
+pandas
+numpy
+scipy
+scikit-learn
+tensorflow-cpu
+firebase-admin 
